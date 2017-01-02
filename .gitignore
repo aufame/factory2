@@ -1,0 +1,13 @@
+#.gitignore
+/uploadfiles
+/tags
+/include/mc_config.h
+*.h
+*.o
+*.a
+*.bak
+cscope.*
+meow*
+core.*
+makefile
+

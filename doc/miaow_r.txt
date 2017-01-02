@@ -1,0 +1,5 @@
+insert into mysql.user(Host,User,Password,ssl_cipher,x509_issuer,x509_subject) values("localhost","miaow_r",password("123456"),'','','');
+flush privileges;
+grant select on meowcloud.mc_devices to miaow_r@"%" identified by 'Miao123456';
+grant select on meowcloud.mc_flowpackage to miaow_r@"%" identified by 'Miao123456';
+flush privileges;
