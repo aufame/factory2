@@ -42,7 +42,6 @@ void Handle_MSG_DSR_LOGIN(TMcPacket *packet)
       terminal=(TTerminal *)dtmr_add(terminalLinks,sessionid,0,0,NULL,termsize,HEARTBEAT_OVERTIME_S);
       memset(terminal,0,termsize);
       loginTime=time(NULL);
-      if(!box_login)((TTermDevice *)terminal)->startup_time=loginTime;
     }
     terminal->term_type=(box_login)?TT_BOX:TT_DEVICE;
     terminal->id=deviceID;
@@ -205,7 +204,7 @@ void Handle_MSG_USR_REGIST(TMcPacket *packet)
 { TMSG_USR_REGIST *req=(TMSG_USR_REGIST *)packet->msg.body;
   U8 ret_error=-1;
   if(MobilePhone_check(req->phone) && Password_check(req->psw))
-  { int vcode_err=vcode_apply(req->phone,req->verifycode);
+  { int vcode_err=vcode_apply(req->verifycode,req->phone);
     if(vcode_err==0)
     { db_lock(TRUE);
       MYSQL_RES *res=db_queryf("select id from `mc_users` where username='%s'",req->phone);
@@ -252,12 +251,12 @@ void Handle_MSG_USR_QUERY_VERSION(TMcPacket *packet)
   if(offset && packet->terminal)
   { MYSQL_ROW row;
     int dev_count=0;
-    res=db_queryf("select sn,ssid,groupid from `mc_devices` where `mc_devices`.username='%s'",packet->terminal->name);
+    res=db_queryf("select sn,name,ssid,groupid from `mc_devices` where `mc_devices`.username='%s'",packet->terminal->name);
     if(res)
     { while((row = mysql_fetch_row(res)))
       { if(dev_count++>0) json[offset++]=',';	
         else offset+=sprintf(json+offset,",\"devices\":[");	
-        offset+=sprintf(json+offset,"{\"sn\":\"%s\",\"ssid\":\"%s\",\"group\":\"Group%s\"}",row[0],row[1],row[2]);	 
+        offset+=sprintf(json+offset,"{\"sn\":\"%s\",\"name\":\"%s\",\"ssid\":\"%s\",\"group\":\"Group%s\"}",row[0],row[1],row[2],row[3]);	 
       }
       mysql_free_result(res);
     }
@@ -416,7 +415,7 @@ void Handle_MSG_USR_CHANGEPSW(TMcPacket *packet)
   if(req->check_mode==0)//使用验证码（旧密码字段无效）
   { //用户在未登录状态，使用验证码修改密码
     if(MobilePhone_check(req->mobilephone) && Password_check(req->new_psw))
-    { int vcode_err=vcode_apply(req->mobilephone,req->verifycode);
+    { int vcode_err=vcode_apply(req->verifycode,req->mobilephone);
       if(vcode_err==0)
     	{ db_queryf("update `mc_users` set password=md5('%s') where username='%s'",req->new_psw,req->mobilephone);
         ret_error=0;
@@ -568,7 +567,7 @@ void Handle_MSG_USR_QUERY_STATE(TMcPacket *packet){
       MYSQL_ROW row=mysql_fetch_row(res);
       if(row){
         int groupid=atoi(row[2]);
-        if(groupid!=17 && groupid!=18 && groupid!=20){
+        if(groupid!=17 && groupid!=18 && groupid!=20){// temporary logic
           ret_state=atoi(row[3]);
         }  
         else{
@@ -607,16 +606,16 @@ void Handle_MSG_USR_QUERY_STATE(TMcPacket *packet){
   ackbody->state=ret_state;
   ackbody->ack_synid=packet->msg.synid;
   msg_send(ackmsg,packet,NULL);
-  printf("###RESPONSE STATE DEV_STATE_OFFLINE to %s\n",req->sn);
+ // printf("###RESPONSE STATE DEV_STATE_OFFLINE to %s\n",req->sn);
 }
 
 
 void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
 /*设备状态说明（对于二代设备，由于拆分成盒子与摄像头终端两部分，不同部分负责上报不同的状态，明细如下）：
  *State 0: 离线状态, 此状态不上报（离线设备不能上报），而是由程序来判断；
- *State 1: 休眠状态, 盒子上报(定时上报间隔约45秒) 
- *State 2: 唤醒状态, 终端上报 
- *State 3: 在线状态, 终端上报 
+ *State 1: 休眠状态, 盒子上报(汽车熄火后设备进入休眠状态，定时上报间隔约45秒) 
+ *State 2: 唤醒状态, 终端上报(休眠状态下被远程唤醒后的状态，并且在IDLE一段时间后会回复到休眠状态,除非汽车发动否则) 
+ *State 3: 在线状态, 终端上报(汽车发动后设备将始终处于工作状态,除非熄火否则不会休眠) 
  *State 4: 正在休眠, 终端上报 
  *State 5: 正在启动, 盒子上报(盒子检测到acc点火或者震动会自动开机,并上报正在启动状态，然后再打开摄像头) 
  *State 6: 巡航状态, 终端上报 
@@ -667,6 +666,7 @@ void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
     db_queryf("update `mc_devices` set state=%d where id=%u",new_state,terminal->id);
     device_stateNotifyUser(terminal,0);
     if(new_state==DEV_STATE_SLEEP)staticMap_generate(terminal);
+    else if(new_state==DEV_STATE_ONLINE)((TTermDevice *)terminal)->startup_time=time(NULL);
   }
 }
 
@@ -723,13 +723,14 @@ void Handle_MSG_DSR_NOTIFY_SNAPSHOT(TMcPacket *packet){
   BOOL gotSnapshot=FALSE;
   TMSG_DSR_NOTIFY_SNAPSHOT *req=(TMSG_DSR_NOTIFY_SNAPSHOT *)packet->msg.body;
   msg_ack(MSG_STA_GENERAL,0,packet);
-  MYSQL_RES *res=db_queryf("select ssid from `mc_devices` where id=%d",packet->terminal->id);
+  MYSQL_RES *res=db_queryf("select ssid,groupid from `mc_devices` where id=%d",packet->terminal->id);
   if(res){
     MYSQL_ROW row = mysql_fetch_row(res);
     if(row && row[0]){
+      int devGroupID=atoi(row[1]); 
       char strTime[32];
       str_fromTime(strTime,"%Y/%m/%d %H:%M:%S",time(NULL));
-      int contentLen=sprintf(strWarning,"小瞳%s在%s检测到一次震动，请您及时确认车辆状况是否异常",row[0],strTime);  
+      int contentLen=sprintf(strWarning,"%s%s在%s检测到一次震动，请您及时确认车辆状况是否异常",(devGroupID==ZSWL_DEV_GROUP)?"设备":"小瞳",row[0],strTime);  
       mysql_free_result(res);
       res=db_queryf("select resname from `mc_snapshot` where termid=%d and property=1 and timestamp=%u",packet->terminal->id,req->timestamp);
       if(res){
@@ -751,14 +752,15 @@ void Handle_MSG_DSR_NOTIFY_STRIKE(TMcPacket *packet){
   msg_ack(MSG_SDA_NOTIFY_STRIKE,0,packet);
   char strWarning[256]="\0";
   char *segment=(packet->terminal->term_type==TT_BOX)?"boxid":"id";
-  MYSQL_RES *res=db_queryf("select id,ssid from `mc_devices` where %s=%u",segment,packet->terminal->id);
+  MYSQL_RES *res=db_queryf("select id,ssid,groupid from `mc_devices` where %s=%u",segment,packet->terminal->id);
   if(res){
     MYSQL_ROW row;
     char strTime[32];
     str_fromTime(strTime,"%Y/%m/%d %H:%M:%S",time(NULL));
     while((row = mysql_fetch_row(res))){
       if(row[1]){
-        sprintf(strWarning,"小瞳%s在%s检测到一次震动，请您及时确认车辆状况是否异常",row[1],strTime);  
+        int devGroupID=atoi(row[2]); 
+        sprintf(strWarning,"%s%s在%s检测到一次震动，请您及时确认车辆状况是否异常",(devGroupID==ZSWL_DEV_GROUP)?"设备":"小瞳",row[1],strTime);  
         push_device_msg(atoi(row[0]),WARNINGMSG_VIBRATE,strWarning);//震动预警
       }
     }
@@ -766,16 +768,17 @@ void Handle_MSG_DSR_NOTIFY_STRIKE(TMcPacket *packet){
   }  
 }
 
-void Handle_MSG_DSR_NOTIFY_LOWPOWER(TMcPacket *packet)
-{ char strWarning[200];
+void Handle_MSG_DSR_NOTIFY_LOWPOWER(TMcPacket *packet){
+  char strWarning[200];
   char *segment=(packet->terminal->term_type==TT_BOX)?"boxid":"id";
   msg_ack(MSG_STA_GENERAL,0,packet);
-  MYSQL_RES *res=db_queryf("select id,ssid from `mc_devices` where %s=%u",segment,packet->terminal->id);
-  if(res)
-  { MYSQL_ROW row;
-    while((row = mysql_fetch_row(res)))
-    { if(row[1]) 
-      { sprintf(strWarning,"小瞳%s检测电瓶电压过低，将暂停远程功能，请及时发动汽车充电。如车辆发动时发现小瞳未启动，请手动开机。",row[1]);  
+  MYSQL_RES *res=db_queryf("select id,ssid,groupid from `mc_devices` where %s=%u",segment,packet->terminal->id);
+  if(res){
+    MYSQL_ROW row;
+    while((row = mysql_fetch_row(res))){
+      if(row[1]){
+        int devGroupID=atoi(row[2]); 
+        sprintf(strWarning,"%s%s检测电瓶电压过低，将暂停远程功能，请及时发动汽车充电。如车辆发动时发现小瞳未启动，请手动开机。",(devGroupID==ZSWL_DEV_GROUP)?"设备":"小瞳",row[1]);  
         push_device_msg(atoi(row[0]),WARNINGMSG_LOWPOWER,strWarning);//缺电预警
       }
     }

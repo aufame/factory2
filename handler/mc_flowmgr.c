@@ -157,35 +157,42 @@ void monitor_flow(void)
   int page=0;
   MYSQL_RES *res;
   printf("####query flow starting...!\r\n");
-  while((res=db_queryf("select mc_devices.id,mc_devices.username,mc_simcard.id,mc_simcard.accessno,mc_simcard.flowstate,mc_simcard.simgroup from mc_devices inner join mc_simcard on mc_devices.imsi=mc_simcard.imsi where mc_devices.session>0 and mc_devices.username is not null limit %d,%d",page*MAX_PER_PAGE,MAX_PER_PAGE)))
+  while((res=db_queryf("select mc_devices.id,mc_devices.username,mc_devices.groupid,mc_simcard.id,mc_simcard.accessno,mc_simcard.flowstate,mc_simcard.simgroup from mc_devices inner join mc_simcard on mc_devices.imsi=mc_simcard.imsi where mc_devices.session>0 and mc_devices.username is not null limit %d,%d",page*MAX_PER_PAGE,MAX_PER_PAGE)))
   { MYSQL_ROW row;
     int page_row_count=mysql_num_rows(res);
     while((row=mysql_fetch_row(res)))
-    { char *accessno=row[3];
+    { char *accessno=row[4];
       if(accessno && accessno[0] && MobilePhone_check(row[1]))
-      { //printf("####query flow:%s:%s\r\n",row[1],row[3]);
-	int packet_count=http_request_flowpackage(atoi(row[5]),accessno,query_buffer,QUERY_BUFFER_SIZE);
+      { //printf("####query flow:%s:%s\r\n",row[1],row[4]);
+	int packet_count=http_request_flowpackage(atoi(row[6]),accessno,query_buffer,QUERY_BUFFER_SIZE);
 	if(packet_count>0)
 	{ U32 total_used=0,total_remains=0;
 	  int flowstate_new=stat_flowState((TFlowPackageItem *)query_buffer,packet_count,&total_used,&total_remains);
 	  //printf("####query flow result==>%d\r\n",flowstate_new);
-	  int flowstate_old=atoi(row[4]);
+	  int flowstate_old=atoi(row[5]);
 	  if(flowstate_new!=flowstate_old)
 	  { U32 devID=atoi(row[0]);
-            U32 simcard=atoi(row[2]);
+            U32 simcard=atoi(row[3]);
             if(db_queryf("update `mc_simcard` set flowstate=%d where id=%u and flowstate=%d",flowstate_new,simcard,flowstate_old))
 	    { if(flowstate_new)
-	      { printf("####query flow send notify to msgbox:%s\r\n",row[1]);
-		if(flowstate_new==-2)  push_device_msg(devID,WARNINGMSG_FLOWDEPLETE,"小瞳温馨提醒：您的流量套餐已用完，为保证您的正常使用，请登录APP通过“流量管理”进行充值");
-		else if(flowstate_new==-1)
-		{ char strWarning[256];
-		  //int curMonth,curDay;
+	      { char strWarning[256];
+                char *devTitle=(atoi(row[2])==ZSWL_DEV_GROUP)?"设备":"小瞳";
+                printf("####query flow send notify to msgbox:%s\r\n",row[1]);
+		if(flowstate_new==-2){
+	          sprintf(strWarning,"%s温馨提醒：您的流量套餐已用完，为保证您的正常使用，请登录APP通过“流量管理”进行充值",devTitle);
+                  push_device_msg(devID,WARNINGMSG_FLOWDEPLETE,strWarning);
+                }
+		else if(flowstate_new==-1){
+                  //int curMonth,curDay;
 		  time_t timep=time(NULL);
                   struct tm *pToday=gmtime(&timep); /*转换为struct tm结构的UTC时间*/
-	          sprintf(strWarning,"小瞳温馨提醒：截至%d月%d日，您的流量套餐已使用%uM，剩余流量%uM，为保证您的正常使用，请及时登录APP通过“流量管理”进行续费充值",pToday->tm_mon+1,pToday->tm_mday,total_used,total_remains);
+	          sprintf(strWarning,"%s温馨提醒：截至%d月%d日，您的流量套餐已使用%uM，剩余流量%uM，为保证您的正常使用，请及时登录APP通过“流量管理”进行续费充值",devTitle,pToday->tm_mon+1,pToday->tm_mday,total_used,total_remains);
 		  push_device_msg(devID,WARNINGMSG_LOWFLOW,strWarning);		
 		}	
-		else push_device_msg(devID,WARNINGMSG_FLOWTOEXPIRE,"小瞳温馨提醒：您的流量套餐即将到期，为保证您的正常使用，请及时登录APP通过“流量管理”进行续费充值");
+		else{
+	          sprintf(strWarning,"%s温馨提醒：您的流量套餐即将到期，为保证您的正常使用，请及时登录APP通过“流量管理”进行续费充值",devTitle);
+                  push_device_msg(devID,WARNINGMSG_FLOWTOEXPIRE,strWarning);
+                }
               }
             }	
           }	

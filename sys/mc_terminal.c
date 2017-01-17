@@ -35,7 +35,7 @@ void staticMap_generate(TTerminal *terminal){
     char xml[255];
     int xmlLen=sprintf(xml,"<xml><action>create</action><device>%s</device><starttime>%u</starttime><endtime>%u</endtime><session>%u</session></xml>",terminal->name,start_time,end_time,terminal->session);
     int ret=hsk_httpPost("http://"WEB_SERVER_HOST"/service/routine/trackmap.php",xml,xmlLen,NULL,0,6);
-    if(ret>0)((TTermDevice *)terminal)->startup_time=end_time;
+    if(ret>0)((TTermDevice *)terminal)->startup_time=0;
     //printf("####POST xml:%s  ########ret=%d\r\n",xml,ret);
   }
 }
