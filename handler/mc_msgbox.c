@@ -3,7 +3,7 @@
 
 void push_device_msg(U32 deviceID,int msgType,char *msgContent)
 { U32 span_filter_s=(msgType==WARNINGMSG_VIBRATE)?60:SPAN_MSG_PUSH_FILTER_S;//震动消息过滤时间设定为60妙
-  char strType[8],*snapshot;
+  char strType[8];
   sprintf(strType,"%d",msgType);
   if(!dtmr_add(commDataLinks,deviceID,MSG_SUR_NOTIFY_MSGBOX,strType,NULL,0,span_filter_s|DTMR_NOVERRIDE))return;
   MYSQL_RES *res=db_queryf("select mc_users.id,mc_users.username,mc_users.session,mc_users.groupid,mc_devices.state from `mc_users`,`mc_devices` where mc_devices.id=%u and mc_devices.username=mc_users.username",deviceID);
@@ -41,13 +41,18 @@ void push_device_msg(U32 deviceID,int msgType,char *msgContent)
 }
 
 #define MIN_INTERVAL_PUSH_GROUP_MSG_S  15
-int push_group_msg(U32 groupid,int msgType,char *msgContent,char *msgTitle)
-{
-	 if(dtmr_add(commDataLinks,msgType,MSG_BSR_NOTIFY,NULL,NULL,0,MIN_INTERVAL_PUSH_GROUP_MSG_S|DTMR_NOVERRIDE))
-	 { char sql[200]="select id,session from `mc_users`";
-	   if(groupid) sprintf(&sql[strlen(sql)]," where groupid=%d",groupid);
-	 	 MYSQL_RES *res=db_query(sql);
-	   if(res)
+int push_group_msg(U32 usrgroup,U32 devgroup,int msgType,char *msgContent,char *msgTitle){
+   if(dtmr_add(commDataLinks,msgType,MSG_BSR_NOTIFY,NULL,NULL,0,MIN_INTERVAL_PUSH_GROUP_MSG_S|DTMR_NOVERRIDE)){
+      char sql[200]="";
+      if(usrgroup){
+        if(devgroup) sprintf(sql,"select `mc_users`.id,`mc_users`.session from `mc_users` inner join `mc_devices` on `mc_users`.username=`mc_devices`.username where `mc_users`.groupid=%d and `mc_devices`.groupid=%d",usrgroup,devgroup);
+        else sprintf(sql,"select id,session from `mc_users` where groupid=%d",usrgroup);
+      }
+      else if(devgroup){
+        sprintf(sql,"select `mc_users`.id,`mc_users`.session from `mc_users` inner join `mc_devices` on `mc_users`.username=`mc_devices`.username where `mc_devices`.groupid=%d",devgroup);
+      }
+      MYSQL_RES *res=db_query(sql);
+      if(res)
 	   { MYSQL_ROW row;
 	 	   while((row=mysql_fetch_row(res)))
 	 	   { TTerminal *usrnode;

@@ -64,17 +64,18 @@ void Handle_MSG_BSR_NOTIFY(TMcPacket *packet)
       }
     }
   }
-  else if(req->action==ACTION_BUR_GROUPMSG)//消息盒子 发送群组消息
-  { U32 groupid=*(U32 *)(req->param_data+0);
-  	U32 msgtype=*(U32 *)(req->param_data+sizeof(U32));
-  	char *msgtitle=(char *)req->param_data+sizeof(U32)*2;
-  	char *msgcontent=msgtitle+strlen(msgtitle)+1;
-  	char *param_end=msgcontent+strlen(msgcontent)+1;
-  	if((int)(param_end-req->param_data)==req->param_size)
-  	{ msg_ack(MSG_STA_GENERAL,0,packet);//处理时间会比较久，先响应
-          ret_error=push_group_msg(groupid,msgtype,msgcontent,msgtitle);
-          return;
-  	}
+  else if(req->action==ACTION_BUR_GROUPMSG){//消息盒子 发送群组消息
+     U32 usrgroup  = *(U32 *)(req->param_data+sizeof(U32)*0);
+     U32 devgroup  = *(U32 *)(req->param_data+sizeof(U32)*1);
+     U32 msgtype   = *(U32 *)(req->param_data+sizeof(U32)*2);
+     char *msgtitle= (char *)(req->param_data+sizeof(U32)*3);
+     char *msgcontent=msgtitle+strlen(msgtitle)+1;
+     char *param_end=msgcontent+strlen(msgcontent)+1;
+     if((int)(param_end-req->param_data)==req->param_size){
+       msg_ack(MSG_STA_GENERAL,0,packet);//处理时间会比较久，先响应
+       ret_error=push_group_msg(usrgroup,devgroup,msgtype,msgcontent,msgtitle);
+       return;
+     }
   }
 
 #if 0  //deprecated interface

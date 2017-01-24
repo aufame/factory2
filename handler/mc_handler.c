@@ -662,12 +662,12 @@ void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
      }
   }*/
   else if(terminal->term_state!=new_state && new_state!=DEV_EVENT_ENGINEOFF){//修改状态变量并写入数据库
+    if(new_state==DEV_STATE_ONLINE)((TTermDevice *)terminal)->startup_time=time(NULL);
+    else if(new_state==DEV_STATE_SLEEP && terminal->term_state!=DEV_STATE_WAKEUP)staticMap_generate(terminal);
     terminal->term_state=new_state;
     db_queryf("update `mc_devices` set state=%d where id=%u",new_state,terminal->id);
     device_stateNotifyUser(terminal,0);
-    if(new_state==DEV_STATE_SLEEP)staticMap_generate(terminal);
-    else if(new_state==DEV_STATE_ONLINE)((TTermDevice *)terminal)->startup_time=time(NULL);
-  }
+ }
 }
 
 void Handle_MSG_USA_NOTIFY_STATE(TMcPacket *packet)
