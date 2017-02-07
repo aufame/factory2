@@ -30,12 +30,12 @@ void device_stateNotifyUser(TTerminal *devTerm,U32 devID){
 void staticMap_generate(TTerminal *terminal){
   U32 end_time=time(NULL);
   U32 start_time=((TTermDevice *)terminal)->startup_time;
+  U32 duration=end_time-start_time;
    // if(strcmp(terminal->name,"CAM-019522FF18000098")==0) printf("##########[%s]EngineOff...start_time:%u,end_time:%u,duration=%d*60000ms\r\n\r\n",terminal->name,start_time,end_time,(end_time-start_time)/60);
-  if(end_time>start_time+30 && start_time>end_time-24*60*60){
+  if(duration>60 && duration<2*24*60*60){
     char xml[255];
     int xmlLen=sprintf(xml,"<xml><action>create</action><device>%s</device><starttime>%u</starttime><endtime>%u</endtime><session>%u</session></xml>",terminal->name,start_time,end_time,terminal->session);
     int ret=hsk_httpPost("http://"WEB_SERVER_HOST"/service/routine/trackmap.php",xml,xmlLen,NULL,0,6);
-    if(ret>0)((TTermDevice *)terminal)->startup_time=0;
     //printf("####POST xml:%s  ########ret=%d\r\n",xml,ret);
   }
 }

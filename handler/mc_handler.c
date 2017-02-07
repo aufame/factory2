@@ -53,10 +53,9 @@ void Handle_MSG_DSR_LOGIN(TMcPacket *packet)
     if(!box_login)
     { terminal->term_state=deviceState; //the login action do not change device state
       ((TTermDevice *)terminal)->boxid=deviceBox;
-      if(deviceState==DEV_STATE_STARTING){
-          ((TTermDevice *)terminal)->startup_time=time(NULL);
-          //puts("################Login and set startup_time");
-      }
+      if(deviceState==DEV_STATE_STARTING) ((TTermDevice *)terminal)->startup_time=time(NULL);
+      else if( ((TTermDevice *)terminal)->startup_time==0) ((TTermDevice *)terminal)->startup_time=loginTime;
+      //puts("################Login and set startup_time");
     }
     strncpy(terminal->name,content->name,SIZE_SN_DEVICE+1);
     error_code=0;
