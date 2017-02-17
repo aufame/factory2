@@ -661,6 +661,7 @@ void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
      }
   }*/
   else if(terminal->term_state!=new_state && new_state!=DEV_EVENT_ENGINEOFF){//修改状态变量并写入数据库
+    //printf("###state from %d to %d\r\n",terminal->term_state,new_state);
     if(new_state==DEV_STATE_ONLINE)((TTermDevice *)terminal)->startup_time=time(NULL);
     else if(new_state==DEV_STATE_SLEEP && terminal->term_state!=DEV_STATE_WAKEUP)staticMap_generate(terminal);
     terminal->term_state=new_state;
@@ -1414,6 +1415,22 @@ void Handle_MSG_DSR_COMMJSON(TMcPacket *packet)
   }
 }
 
+/*
+static CancelBoxBinding(int boxid){
+   MYSQL_RES *res=db_queryf("select id,session,state from mc_devices where boxid=%d",boxid);
+   if(res){
+     MYSQL_ROW row;
+     while((row=mysql_fetch_row(res))){
+         U32 dev_session=atoi(row[1]);
+                U32 dev_state=atoi(row[2]);
+                if(dev_session==0 && dev_state!=DEV_STATE_OFFLINE){
+                  U32 dev_id=atoi(row[0]);
+                }
+              }
+              mysql_free_result(res);
+            }
+}
+*/
 
 void Handle_MSG_DSR_UPDATE_BOXSN(TMcPacket *packet)
 { TMSG_DSR_UPDATE_BOXSN *req=(TMSG_DSR_UPDATE_BOXSN *)packet->msg.body;
@@ -1428,6 +1445,8 @@ void Handle_MSG_DSR_UPDATE_BOXSN(TMcPacket *packet)
         TTermDevice *tbox=(TTermDevice *)(packet->terminal);
         if(boxid!=tbox->boxid)
         { char *box_imsi=(row[1])?row[1]:"";  
+          //CancelBoxBinding(atoi(row[0]));//cancel bind of the target box to any other devices;
+          db_queryf("update `mc_devices` set boxid=0,imsi=null,state=0 where boxid=%s",row[0]);
           db_queryf("update `mc_devices` set boxid=%s,imsi='%s' where id=%u",row[0],box_imsi,packet->terminal->id);
           tbox->boxid=boxid;
         }
