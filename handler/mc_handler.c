@@ -501,19 +501,22 @@ void Handle_MSG_USR_GETBINDLIST(TMcPacket *packet){
   TMSG_SUA_GETBINDLIST *ackBody=(TMSG_SUA_GETBINDLIST *)ackmsg->body;
   MYSQL_RES *res=db_queryf("select `mc_devices`.sn,`mc_devices`.name,`mc_devices`.ssid,`mc_uidpool`.uid,`mc_devices`.state from `mc_devices` left join `mc_uidpool` on `mc_devices`.sn=`mc_uidpool`.sn where `mc_devices`.username='%s' limit %d",packet->terminal->name,MAX_BINDED_NUM);
   char *json=(char *)ackBody->json.data;
-  int offset=sprintf(json,"{\"items\":[");	
+  int jslen=sprintf(json,"{\"items\":[");	
   if(res){
     MYSQL_ROW row;
     int bind_count=0;
     while((row = mysql_fetch_row(res))){ 
-      if(bind_count++>0) json[offset++]=',';	
-      offset+=sprintf(json+offset,"{\"sn\":\"%s\",\"name\":\"%s\",\"ssid\":\"%s\",\"uid\":\"%s\",\"state\":\"%s\"}",row[0],row[1],row[2],row[3],row[4]);
+      if(bind_count++>0) json[jslen++]=',';	
+      jslen+=sprintf(json+jslen,"{\"sn\":\"%s\",\"name\":\"%s\",\"ssid\":\"%s\",\"uid\":\"%s\",\"state\":\"%s\"}",row[0],row[1],row[2],row[3],row[4]);
     }
     mysql_free_result(res);
   }  
-  offset+=sprintf(json+offset,"]}");
+  jslen+=sprintf(json+jslen,"]}");
+  jslen++;//保留null-terminate符位置
+
   ackBody->ack_synid=packet->msg.synid;
-  ackmsg->bodylen=sizeof(TMSG_SUA_GETBINDLIST)+offset+1;//重新计算实际消息体长度,保留null-terminate符位置。
+  ackBody->json.datalen=jslen;
+  ackmsg->bodylen=sizeof(TMSG_SUA_GETBINDLIST)+jslen;//重新计算实际消息体长度。
   msg_send(ackmsg,packet,NULL);
 }
 
