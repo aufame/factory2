@@ -781,7 +781,8 @@ void Handle_MSG_DSR_NOTIFY_LOWPOWER(TMcPacket *packet){
     while((row = mysql_fetch_row(res))){
       if(row[1]){
         int devGroupID=atoi(row[2]); 
-        sprintf(strWarning,"%s%s检测电瓶电压过低，将暂停远程功能，请及时发动汽车充电。如车辆发动时发现小瞳未启动，请手动开机。",(devGroupID==ZSWL_DEV_GROUP)?"设备":"小瞳",row[1]);  
+        char *devName=(devGroupID==ZSWL_DEV_GROUP)?"设备":"小瞳";
+        sprintf(strWarning,"%s%s检测电瓶电压过低，将暂停远程功能，请及时发动汽车充电。如车辆发动时发现%s未启动，请手动开机。",devName,row[1],devName);  
         push_device_msg(atoi(row[0]),WARNINGMSG_LOWPOWER,strWarning);//缺电预警
       }
     }
