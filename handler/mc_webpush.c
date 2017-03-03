@@ -134,14 +134,14 @@ void Handle_MSG_BSR_NOTIFY(TMcPacket *packet)
       MYSQL_RES *res=db_queryf("select session,boxid from `mc_devices` where id=%u",param_array[index]);
       if(res){
         MYSQL_ROW row=mysql_fetch_row(res);
-        if(row){
+        if(row){/*
            U32 boxid=atoi(row[1]);
            if(boxid){
              mysql_free_result(res);  
              res=db_queryf("select session from `mc_boxes` where id=%u",boxid);
              if(res && row) dev_session=atoi(row[0]);
            }
-           else dev_session=atoi(row[0]);
+           else */dev_session=atoi(row[0]);
         }
         if(res)mysql_free_result(res);  
       } 
