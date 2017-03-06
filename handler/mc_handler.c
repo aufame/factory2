@@ -185,13 +185,6 @@ void Handle_MSG_USR_LOGIN(TMcPacket *packet)
   if(error_code==0)DBLog_AppendData("\xFF\xFF\xFF\xFF\x00",5,terminal); //登录日志
 }
 
-void Handle_MSG_USA_KICKOFF(TMcPacket *packet)
-{/* TMSG_ACK_GENERAL *ackBody=(TMSG_ACK_GENERAL *)packet->msg.body;
-  if(ackBody->error==0)
-  { Log_AppendText("user kicked off!");
-  }*/
-}
-
 void Handle_MSG_USR_LOGOUT(TMcPacket *packet)
 { db_queryf("update `mc_users` set session=0,logouttime=unix_timestamp() where id=%u",packet->terminal->id);
   dtmr_remove(packet->terminal);
@@ -542,22 +535,6 @@ void Handle_MSG_VSR_GETBINDUSER(TMcPacket *packet)
   msg_send(ackmsg,packet,NULL); 
 }
 
-void Handle_MSG_DSA_QUERY_STATE(TMcPacket *packet){
- TMcPacket *sus_packet=RESPONSE_APPENDIX(packet);
- TMSG_DSA_QUERY_STATE *response=(TMSG_DSA_QUERY_STATE *)packet->msg.body;
- TMcMsg *ackmsg=msg_alloc(MSG_SUA_QUERY_STATE,sizeof(TMSG_SUA_QUERY_STATE));
- TMSG_SUA_QUERY_STATE *ackbody=(TMSG_SUA_QUERY_STATE *)ackmsg->body;
- ackbody->error=response->error;
- ackbody->state=response->state;
- ackbody->ack_synid=sus_packet->msg.synid;
- msg_send(ackmsg,sus_packet,NULL);
- if(response->error==0 && packet->terminal->term_type==TT_DEVICE && packet->terminal->term_state!=response->state){
-   packet->terminal->term_state=response->state;
-   db_queryf("update `mc_devices` set state=%d where id=%u",response->state,packet->terminal->id);
- } 
-// printf("###RESPONSE STATE %d\n",(raw->error)?-1:raw->state);
- //puts("msg_ack(MSG_SUA_QUERY_STATE,dev_state,sus_packet);");
-}
 
 void Handle_MSG_USR_QUERY_STATE(TMcPacket *packet){
   U8 ret_error=1,ret_state=DEV_STATE_OFFLINE;
@@ -591,7 +568,7 @@ void Handle_MSG_USR_QUERY_STATE(TMcPacket *packet){
                     TMcMsg *reqmsg=msg_alloc(MSG_SDR_QUERY_STATE,sizeof(TMSG_SDR_QUERY_STATE));
                     memcpy(((TMSG_SDR_QUERY_STATE *)reqmsg->body)->sn,req->sn,SIZE_SN_DEVICE+1);
                    // printf("###SEND SDR_QUERY_STATE %s\n",req->sn);
-                    msg_request(reqmsg,dev_node,MSG_DSA_QUERY_STATE,packet,0);
+                    msg_request(reqmsg,dev_node,MSG_DSA_QUERY_STATE,packet,sizeof(TMcPacket));
                     if(res)mysql_free_result(res);
                     return;
                 }
@@ -673,11 +650,6 @@ void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
  }
 }
 
-void Handle_MSG_USA_NOTIFY_STATE(TMcPacket *packet)
-{ /*TMSG_ACK_GENERAL *ackBody=(TMSG_ACK_GENERAL *)packet->msg.body;
-  if(ackBody->error==0)Log_AppendText("terminal state notify succeed!");
-  */
-}
 
 void Handle_MSG_USR_READ_OFFLINEMSG(TMcPacket *packet)
 { //mc_msgbox表的category字段为负表示已经标志为删除的消息。
@@ -790,10 +762,6 @@ void Handle_MSG_DSR_NOTIFY_LOWPOWER(TMcPacket *packet){
   }  
 }
 
-void Handle_MSG_USA_NOTIFY_MSGBOX(TMcPacket *packet)
-{
-}
-
 void Handle_MSG_USR_WAKEUP(TMcPacket *packet)
 { TMSG_USR_WAKEUP *req=(TMSG_USR_WAKEUP *)packet->msg.body;
   U32 dev_session=0;
@@ -824,7 +792,7 @@ void Handle_MSG_USR_WAKEUP(TMcPacket *packet)
     { TMcMsg *reqmsg=msg_alloc(MSG_SDR_WAKEUP,sizeof(TMSG_SDR_WAKEUP));
       TMSG_SDR_WAKEUP *reqbody=(TMSG_SDR_WAKEUP *)reqmsg->body;
       reqbody->value=req->action;
-      msg_request(reqmsg,dev_node,MSG_DSA_WAKEUP,packet,packet->msg.bodylen);
+      msg_request(reqmsg,dev_node,MSG_DSA_WAKEUP,packet,sizeof(TMcPacket)+packet->msg.bodylen);
     }else goto label_fail;
   }
   else
@@ -833,13 +801,6 @@ void Handle_MSG_USR_WAKEUP(TMcPacket *packet)
   }
 }
 
-void Handle_MSG_DSA_WAKEUP(TMcPacket *packet)
-{ TMcPacket *sus_packet=RESPONSE_APPENDIX(packet);
-  U8 ret_error=((TMSG_ACK_GENERAL *)packet->msg.body)->error;
-  msg_ack(MSG_SUA_WAKEUP,ret_error,sus_packet);
-/* 终端设备响应成功只表示响应操作，不表示已经成功执行唤醒或者休眠。
-   当终端设备执行完唤醒或者休眠后（状态发生变更时），会通过MSG_DSR_NOTIFY_STATE指令来通知服务器。*/
-}
 
 enum{ERRLIVE_UNKNOWN=-1,ERRLIVE_OK=0,ERRLIVE_USER_NOT_EXIST=1,ERRLIVE_USER_NOT_ONLINE=2,ERRLIVE_USER_BUSY=3,ERRLIVE_USER_DENY=4,ERRLIVE_DEVICE_NOT_ONLINE=10,ERRLIVE_DEVICE_DENY=11,ERRLIVE_LIVE_NOT_EXIST=20,ERRLIVE_UID_NOT_EXIST,ERRLIVE_SELFLOOP,ERRLIVE_BIND_ERROR};
 /*
@@ -919,7 +880,7 @@ void Handle_MSG_USR_LIVE(TMcPacket *packet)
      memcpy(ackBody->uid,req->uid,MAXLEN_UID+1);
      ackBody->audio=req->audio;
      ackBody->action=req->action;
-     msg_request(msg,visitor_node,MSG_VSA_LIVE,packet,packet->msg.bodylen);
+     msg_request(msg,visitor_node,MSG_VSA_LIVE,packet,sizeof(TMcPacket)+packet->msg.bodylen);
    }
    else
    {  //失败，返回错误
@@ -977,7 +938,7 @@ void Handle_MSG_VSR_LIVE(TMcPacket *packet)
     TMSG_SUR_LIVE *reqBody=(TMSG_SUR_LIVE *)msg->body; 
     memcpy(reqBody->visitor_phone,packet->terminal->name,SIZE_MOBILE_PHONE+1);
     memcpy(reqBody->visitor_nick,visitor_nick,MAXLEN_NICKNAME+1);
-    msg_request(msg,usr_node,MSG_USA_LIVE,packet,packet->msg.bodylen);
+    msg_request(msg,usr_node,MSG_USA_LIVE,packet,sizeof(TMcPacket)+packet->msg.bodylen);
     puts("SuspendPacketForResponse(binded_usersession,g_synid,MSG_USA_LIVE,packet,0);");
   }
   else
@@ -1027,19 +988,20 @@ void Handle_MSG_VSR_LIVE_RET(TMcPacket *packet)
     TMSG_SUR_LIVE_RET *reqBody=(TMSG_SUR_LIVE_RET *)msg->body; 
     memcpy(reqBody->visitor_phone,visitor_node->name,SIZE_MOBILE_PHONE+1);
     reqBody->error=req->value;
-    msg_request(msg,bind_user,MSG_USA_LIVE_RET,packet,0);
+    msg_request(msg,bind_user,MSG_USA_LIVE_RET,packet,sizeof(TMcPacket));
     puts("SuspendPacketForResponse(Session_BindedUser,g_synid,MSG_USA_LIVE_RET,packet,0);");
   }   
 }
 
-void Handle_MSG_USA_LIVE_RET(TMcPacket *packet)
-{ U8 ret_error=((TMSG_ACK_GENERAL *)packet->msg.body)->error;
-  msg_ack(MSG_SVA_LIVE_RET,ret_error,RESPONSE_APPENDIX(packet));
+void Response_MSG_USA_LIVE_RET(TMcPacket *packet,void *extraData)
+{ TMcPacket *sus_packet=(TMcPacket *)extraData;
+  U8 ret_error=((TMSG_ACK_GENERAL *)packet->msg.body)->error;
+  msg_ack(MSG_SVA_LIVE_RET,ret_error,sus_packet);
   puts("msg_ack(MSG_SVA_LIVE_RET,ret_error,sus_packet);");
 }
 
-void Handle_MSG_VSA_LIVE(TMcPacket *packet)
-{ TMcPacket *sus_packet=RESPONSE_APPENDIX(packet);
+void Response_MSG_VSA_LIVE(TMcPacket *packet,void *extraData)
+{ TMcPacket *sus_packet=(TMcPacket *)extraData;
   U8 ret_error=((TMSG_ACK_GENERAL *)packet->msg.body)->error;
   if(!ret_error)
   { TMSG_USR_LIVE *sus_req=(TMSG_USR_LIVE *)sus_packet->msg.body;
@@ -1085,9 +1047,9 @@ void Handle_MSG_VSA_LIVE(TMcPacket *packet)
   msg_send(msg,sus_packet,NULL);
 }
 
-void Handle_MSG_USA_LIVE(TMcPacket *packet)
+void Response_MSG_USA_LIVE(TMcPacket *packet,void *extraData)
 { U8 ret_error=((TMSG_ACK_GENERAL *)packet->msg.body)->error;
-  TMcPacket *sus_packet=RESPONSE_APPENDIX(packet);
+  TMcPacket *sus_packet=(TMcPacket *)extraData;
   TMcMsg *msg=msg_alloc(MSG_SVA_LIVE,sizeof(TMSG_SVA_LIVE));
   TMSG_SVA_LIVE *ackBody=(TMSG_SVA_LIVE *)msg->body;
   ackBody->error=ret_error;

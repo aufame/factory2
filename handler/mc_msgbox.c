@@ -1,6 +1,12 @@
 #include "mc_routine.h"
 
 
+static void store_offline_msg(int msgType,char *msgContent,U32 userid){
+  char sqlText[512];
+  sprintf(sqlText,"`mc_msgbox` set category=%d,content='%s',addtime=unix_timestamp(),recipient=%d",msgType,msgContent,userid);
+  if(!db_queryf("update %s where category<=0 or addtime<unix_timestamp()-7*24*60*60 order by addtime asc limit 1",sqlText))db_queryf("insert into %s",sqlText);
+}
+ 
 void push_device_msg(U32 deviceID,int msgType,char *msgContent)
 { U32 span_filter_s=(msgType==WARNINGMSG_VIBRATE)?60:SPAN_MSG_PUSH_FILTER_S;//震动消息过滤时间设定为60妙
   char strType[8];
@@ -26,9 +32,7 @@ void push_device_msg(U32 deviceID,int msgType,char *msgContent)
            msg_request(reqmsg,usrnode,MSG_USA_NOTIFY_MSGBOX,NULL,0);
         }  
         else if(msgType<10)//存储离线消息
-        { char sqlText[512];
-          sprintf(sqlText,"`mc_msgbox` set category=%d,content='%s',addtime=unix_timestamp(),recipient=%d",msgType,msgContent,binded_userid);
-          if(!db_queryf("update %s where category<=0 or addtime<unix_timestamp()-7*24*60*60 order by addtime asc limit 1",sqlText))db_queryf("insert into %s",sqlText);
+        { store_offline_msg(msgType,msgContent,binded_userid);
         } 
       }
       if((msgType==WARNINGMSG_VIBRATE && atoi(row[4])==DEVSTATE_SLEEP) || msgType==WARNINGMSG_LOWPOWER || msgType==WARNINGMSG_FLOWDEPLETE) //强制发送短信(不管用户是否允许接收消息推送)
@@ -39,6 +43,13 @@ void push_device_msg(U32 deviceID,int msgType,char *msgContent)
     mysql_free_result(res);   
   }
 }
+
+void push_device_msg_timeout(TMcPacket *request){
+  U32 userid=request->terminal->id;
+  TMSG_SUR_NOTIFY_MSGBOX *reqMsg=(TMSG_SUR_NOTIFY_MSGBOX *)request->msg.body;
+  store_offline_msg(reqMsg->type,reqMsg->content,userid);
+}
+
 
 #define MIN_INTERVAL_PUSH_GROUP_MSG_S  15
 int push_group_msg(U32 usrgroup,U32 devgroup,int msgType,char *msgContent,char *msgTitle){
