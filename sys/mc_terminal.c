@@ -18,7 +18,7 @@ void device_stateNotifyUser(TTerminal *devTerm,U32 devID){
             if(row[1])memcpy(reqbody->device_sn,row[1],SIZE_SN_DEVICE+1);
             reqbody->state_type=0;
             reqbody->state_value=(devTerm)?devTerm->term_state:atoi(row[2]);
-            msg_request(reqmsg,usrnode,MSG_USA_NOTIFY_STATE,NULL,0);
+            msg_request(reqmsg,usrnode,NULL,0);
           }
         }  
       }

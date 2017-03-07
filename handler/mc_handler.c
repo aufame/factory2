@@ -132,7 +132,7 @@ void Handle_MSG_USR_LOGIN(TMcPacket *packet)
                { //同一用户名多处登录的状况
                  //将原先登录的用户踢下线
                  TMcMsg *reqmsg=msg_alloc(MSG_SUR_KICKOFF,0);
-                 msg_request(reqmsg,terminal,MSG_USA_KICKOFF,NULL,0);
+                 msg_request(reqmsg,terminal,NULL,0);
                  //安全删除原先登录的用户节点
                  dtmr_remove(terminal);//删除后的节点无法被查找，但会保留足够长一段时间
                  terminalKickOff=terminal;
@@ -568,7 +568,7 @@ void Handle_MSG_USR_QUERY_STATE(TMcPacket *packet){
                     TMcMsg *reqmsg=msg_alloc(MSG_SDR_QUERY_STATE,sizeof(TMSG_SDR_QUERY_STATE));
                     memcpy(((TMSG_SDR_QUERY_STATE *)reqmsg->body)->sn,req->sn,SIZE_SN_DEVICE+1);
                    // printf("###SEND SDR_QUERY_STATE %s\n",req->sn);
-                    msg_request(reqmsg,dev_node,MSG_DSA_QUERY_STATE,packet,sizeof(TMcPacket));
+                    msg_request(reqmsg,dev_node,packet,sizeof(TMcPacket));
                     if(res)mysql_free_result(res);
                     return;
                 }
@@ -792,7 +792,7 @@ void Handle_MSG_USR_WAKEUP(TMcPacket *packet)
     { TMcMsg *reqmsg=msg_alloc(MSG_SDR_WAKEUP,sizeof(TMSG_SDR_WAKEUP));
       TMSG_SDR_WAKEUP *reqbody=(TMSG_SDR_WAKEUP *)reqmsg->body;
       reqbody->value=req->action;
-      msg_request(reqmsg,dev_node,MSG_DSA_WAKEUP,packet,sizeof(TMcPacket)+packet->msg.bodylen);
+      msg_request(reqmsg,dev_node,packet,sizeof(TMcPacket)+packet->msg.bodylen);
     }else goto label_fail;
   }
   else
@@ -880,7 +880,7 @@ void Handle_MSG_USR_LIVE(TMcPacket *packet)
      memcpy(ackBody->uid,req->uid,MAXLEN_UID+1);
      ackBody->audio=req->audio;
      ackBody->action=req->action;
-     msg_request(msg,visitor_node,MSG_VSA_LIVE,packet,sizeof(TMcPacket)+packet->msg.bodylen);
+     msg_request(msg,visitor_node,packet,sizeof(TMcPacket)+packet->msg.bodylen);
    }
    else
    {  //失败，返回错误
@@ -938,7 +938,7 @@ void Handle_MSG_VSR_LIVE(TMcPacket *packet)
     TMSG_SUR_LIVE *reqBody=(TMSG_SUR_LIVE *)msg->body; 
     memcpy(reqBody->visitor_phone,packet->terminal->name,SIZE_MOBILE_PHONE+1);
     memcpy(reqBody->visitor_nick,visitor_nick,MAXLEN_NICKNAME+1);
-    msg_request(msg,usr_node,MSG_USA_LIVE,packet,sizeof(TMcPacket)+packet->msg.bodylen);
+    msg_request(msg,usr_node,packet,sizeof(TMcPacket)+packet->msg.bodylen);
     puts("SuspendPacketForResponse(binded_usersession,g_synid,MSG_USA_LIVE,packet,0);");
   }
   else
@@ -988,7 +988,7 @@ void Handle_MSG_VSR_LIVE_RET(TMcPacket *packet)
     TMSG_SUR_LIVE_RET *reqBody=(TMSG_SUR_LIVE_RET *)msg->body; 
     memcpy(reqBody->visitor_phone,visitor_node->name,SIZE_MOBILE_PHONE+1);
     reqBody->error=req->value;
-    msg_request(msg,bind_user,MSG_USA_LIVE_RET,packet,sizeof(TMcPacket));
+    msg_request(msg,bind_user,packet,sizeof(TMcPacket));
     puts("SuspendPacketForResponse(Session_BindedUser,g_synid,MSG_USA_LIVE_RET,packet,0);");
   }   
 }

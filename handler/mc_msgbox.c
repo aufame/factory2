@@ -29,7 +29,7 @@ void push_device_msg(U32 deviceID,int msgType,char *msgContent)
            reqbody->timestamp=time(NULL);
            reqbody->type=msgType;
            strcpy(reqbody->content,msgContent); 
-           msg_request(reqmsg,usrnode,MSG_USA_NOTIFY_MSGBOX,NULL,0);
+           msg_request(reqmsg,usrnode,NULL,0);
         }  
         else if(msgType<10)//存储离线消息
         { store_offline_msg(msgType,msgContent,binded_userid);
@@ -74,7 +74,7 @@ int push_group_msg(U32 usrgroup,U32 devgroup,int msgType,char *msgContent,char *
            reqbody->timestamp=time(NULL);
            reqbody->type=msgType;
            sprintf(reqbody->content,"%s\r%s",msgTitle,msgContent); 
-           msg_request(reqmsg,usrnode,MSG_USA_NOTIFY_MSGBOX,NULL,0);
+           msg_request(reqmsg,usrnode,NULL,0);
            usleep(100);
 	 	     }
 	 	     else//存储离线消息

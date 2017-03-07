@@ -4,7 +4,6 @@ void Response_MSG_TIMEOUT(TMcPacket *request,void *extraData){
   switch(request->msg.msgid){
       case MSG_SUR_NOTIFY_MSGBOX:{
              extern void push_device_msg_timeout(TMcPacket *);
-             puts("#####MSG_SUR_NOTIFY_MSGBOX:: Response_MSG_TIMEOUT!!!");
              push_device_msg_timeout(request);
            }
            break;
@@ -25,7 +24,7 @@ void Response_MSG_DSA_QUERY_STATE(TMcPacket *response,void *extraData){
    db_queryf("update `mc_devices` set state=%d where id=%u",ackData->state,response->terminal->id);
  } 
  //printf("###RESPONSE STATE %d\n",(raw->error)?-1:raw->state);
- printf("####respose query state =%d\r\n",ackbody->error);
+ //printf("####respose query state =%d\r\n",ackbody->error);
 }
 
 void  Response_MSG_DSA_WAKEUP(TMcPacket *response,void *extraData)
@@ -33,7 +32,7 @@ void  Response_MSG_DSA_WAKEUP(TMcPacket *response,void *extraData)
   U8 ret_error=((TMSG_ACK_GENERAL *)response->msg.body)->error;
   msg_ack(MSG_SUA_WAKEUP,ret_error,sus_packet);
   
-  printf("####respose wakeup =%d\r\n",ret_error);
+ // printf("####respose wakeup =%d\r\n",ret_error);
 /* 终端设备响应成功只表示响应操作，不表示已经成功执行唤醒或者休眠。
    当终端设备执行完唤醒或者休眠后（状态发生变更时），会通过MSG_DSR_NOTIFY_STATE指令来通知服务器。*/
 }

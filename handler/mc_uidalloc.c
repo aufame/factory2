@@ -83,7 +83,7 @@ void Handle_MSG_DSR_APPLYFORUID(TMcPacket *packet){
               strncpy(ackbody->device_sn,packet->terminal->name,SIZE_SN_DEVICE+1);
               ackbody->state_type=1;//UID已经变更(state值无效)
               ackbody->state_value=0;//UID已经变更(state值无效)
-              msg_request(reqmsg,usrnode,MSG_USA_NOTIFY_STATE,NULL,0);
+              msg_request(reqmsg,usrnode,NULL,0);
             }
           }    
         }

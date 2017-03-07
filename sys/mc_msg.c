@@ -93,7 +93,7 @@ BOOL msg_response_dispatch(TMcPacket *packet,void msgHandle(TMcPacket *,void *))
     TSuspendRequest *susRequest=(TSuspendRequest *)dtmr_find(suspendRequestLinks,ack->ack_synid,0,NULL,DTMR_FOREVER);
     if(susRequest){
       U32 _ackSession=(susRequest->reqPacket.terminal)?susRequest->reqPacket.terminal->session:SERVER_DYNAMIC_SESSION(&packet->msg);
-      if(_ackSession==packet->msg.sessionid && susRequest->ack_msg==packet->msg.msgid){
+      if(_ackSession==packet->msg.sessionid /*&& susRequest->ack_msg==packet->msg.msgid*/){
          // RESPONSE_APPENDIX(packet)=susRequest->extraData;
           msgHandle(packet,susRequest->extraData);
 	  ret=TRUE;
@@ -166,7 +166,7 @@ void msg_send(TMcMsg *msg,TMcPacket *packet,TTerminal *terminal)
 	 msg_sendto(msg,peerAddr,spyAddr);
 }
 //---------------------------------------------------------------------------
-void msg_request(TMcMsg *reqMsg,TTerminal *terminal,U32 ackMsgID,void *extraData,U32 extraSize)
+void msg_request(TMcMsg *reqMsg,TTerminal *terminal,/*U32 ackMsgID,*/void *extraData,U32 extraSize)
 { msg_send(reqMsg,NULL,terminal);//服务器主动发起的请求必定是UDP协议。
   //printf("[request send to %s:%d @%u]\r\n",inet_ntoa(*((struct in_addr *)&terminal->loginAddr.ip)),terminal->loginAddr.port,time(NULL));
   //等接收到B对象的响应后，再处理挂起的A对象的packet。
@@ -180,7 +180,7 @@ void msg_request(TMcMsg *reqMsg,TTerminal *terminal,U32 ackMsgID,void *extraData
   }
   TSuspendRequest *node=(TSuspendRequest *)dtmr_add(suspendRequestLinks,reqMsg->synid,0,NULL,NULL,req_packet_size,REQMSG_RETRY_INTERVAL_S|DTMR_LOCK);
   if(node)
-  { node->ack_msg=ackMsgID;
+  { //node->ack_msg=ackMsgID;
     node->retry_counter=1;
     node->reqPacket.terminal=terminal;
     if(terminal){
