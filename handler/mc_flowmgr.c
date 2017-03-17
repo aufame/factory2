@@ -176,7 +176,8 @@ void monitor_flow(void)
             if(db_queryf("update `mc_simcard` set flowstate=%d where id=%u and flowstate=%d",flowstate_new,simcard,flowstate_old))
 	    { if(flowstate_new)
 	      { char strWarning[256];
-                char *devTitle=(atoi(row[2])==ZSWL_DEV_GROUP)?"设备":"小瞳";
+                int dev_group=atoi(row[2]); 
+                char *devTitle=(dev_group==ZSWL_DEV_GROUP1 ||dev_group==ZSWL_DEV_GROUP2)?"设备":"小瞳";
                 printf("####query flow send notify to msgbox:%s\r\n",row[1]);
 		if(flowstate_new==-2){
 	          sprintf(strWarning,"%s温馨提醒：您的流量套餐已用完，为保证您的正常使用，请登录APP通过“流量管理”进行充值",devTitle);
