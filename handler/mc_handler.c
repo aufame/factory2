@@ -110,20 +110,20 @@ void Handle_MSG_USR_LOGIN(TMcPacket *packet)
   if(packet->msg.msgid==MSG_USR_LOGIN){
      TMSG_USR_LOGIN *content=(TMSG_USR_LOGIN *)packet->msg.body;
      username=content->name;
-     if(content->psw[0]=='\0' || Password_check(content->psw))sprintf(pwd_pattern,"'%s'",content->psw);
+     if(content->psw[0]=='\0' || Password_check(content->psw))sprintf(pwd_pattern,"md5('%s')",content->psw);
      else pwd_pattern[0]='\0';//Invalid password!
   }
   else{
      TMSG_USR_LOGIN2 *content=(TMSG_USR_LOGIN2 *)packet->msg.body;
      username=content->name;
-     if(strlen(content->psw_md5)==SIZE_MD5 && Password_check(content->psw_md5)) sprintf(pwd_pattern,"md5('%s')",content->psw_md5);
+     if(strlen(content->psw_md5)==SIZE_MD5 && Password_check(content->psw_md5)) sprintf(pwd_pattern,"'%s'",content->psw_md5);
      else pwd_pattern[0]='\0'; //Invalid password!
   }
 
-  if(db_checkSQL(username) && pwd_pattern[0]!='\0')
-  {  MYSQL_RES *res=db_queryf("select id,session,groupid,sex,msgpush,livepush from `mc_users` where username='%s' and password=%s",username,pwd_pattern);
-     if(res)
-     {  MYSQL_ROW row=mysql_fetch_row(res);
+  if(db_checkSQL(username) && pwd_pattern[0]!='\0'){ 
+     MYSQL_RES *res=db_queryf("select id,session,groupid,sex,msgpush,livepush from `mc_users` where username='%s' and password=%s",username,pwd_pattern);
+     if(res){ 
+        MYSQL_ROW row=mysql_fetch_row(res);
         if(row)
         { userid=atoi(row[0]);
           sessionid=atoi(row[1]);
