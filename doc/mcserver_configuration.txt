@@ -12,6 +12,8 @@
   其中，操作系统linux centos 32/64位,6.0版本以上;
   mysql数据库 5.1以上;
    
+C/S和B/S混合架构：
+Centos C-Daemon + MySQL + Apache + PHP 
 
 
 

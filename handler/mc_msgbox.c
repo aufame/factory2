@@ -12,7 +12,7 @@ void push_device_msg(U32 deviceID,int msgType,char *msgContent)
   char strType[8];
   sprintf(strType,"%d",msgType);
   if(!dtmr_add(commDataLinks,deviceID,MSG_SUR_NOTIFY_MSGBOX,strType,NULL,0,span_filter_s|DTMR_NOVERRIDE))return;
-  MYSQL_RES *res=db_queryf("select mc_users.id,mc_users.username,mc_users.session,mc_users.groupid,mc_devices.state from `mc_users`,`mc_devices` where mc_devices.id=%u and mc_devices.username=mc_users.username",deviceID);
+  MYSQL_RES *res=db_queryf("select mc_users.id,mc_users.username,mc_users.session,mc_users.groupid,mc_devices.state,mc_users.password,mc_users.wx_openid from `mc_users`,`mc_devices` where mc_devices.id=%u and mc_devices.username=mc_users.username",deviceID);
   if(res){ 
     U32 binded_userid;
     MYSQL_ROW row=mysql_fetch_row(res);
@@ -36,8 +36,13 @@ void push_device_msg(U32 deviceID,int msgType,char *msgContent)
         } 
       }
       if((msgType==WARNINGMSG_VIBRATE && atoi(row[4])==DEVSTATE_SLEEP) || msgType==WARNINGMSG_LOWPOWER || msgType==WARNINGMSG_FLOWDEPLETE) //强制发送短信(不管用户是否允许接收消息推送)
-      {	//为降低成本，非休眠状态下的震动不发短信。
+      { char *wx_openid=row[6];	
+        char *pwd_md5=row[5];
+        //为降低成本，非休眠状态下的震动不发短信。
       	sms_send(msgContent,binded_phone,usrgroup);//will consume much time
+        if(wx_openid && wx_openid[0]){
+          wx_send_message(msgContent,binded_phone,pwd_md5); 
+        }
       }
     }  
     mysql_free_result(res);   
@@ -88,4 +93,17 @@ int push_group_msg(U32 usrgroup,U32 devgroup,int msgType,char *msgContent,char *
 	   }
 	   return 0;
 	 }else return -1;		  
+}
+
+
+int wx_send_message(char *content,char *username,char *pwd_md5){
+  const int BUFSIZE=512;
+  //char *wx_server="https://pay.mplanet.cn/weixin/php/message.php";
+  char *wx_server="http://"WEB_SERVER_HOST"/service/device_msg/index.php";
+  char msgbuf[BUFSIZE];
+  sprintf(msgbuf,"username=%s&password=%s&message=%s&url=%s",username,pwd_md5,content,wx_server);
+  //puts("######wx_send_message...");
+  if(hsk_httpPost(HTTPS_PROXY,msgbuf,strlen(msgbuf),msgbuf,BUFSIZE,5)>0){
+      puts(msgbuf);
+  }
 }

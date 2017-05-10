@@ -29,7 +29,7 @@ void device_stateNotifyUser(TTerminal *devTerm,U32 devID){
 //---------------------------------------------------------------------------
 void staticMap_generate(TTerminal *terminal){
   U32 end_time=time(NULL);
-  U32 start_time=((TTermDevice *)terminal)->startup_time;
+  U32 start_time=((TTermDevice *)terminal)->onlinetime;
   U32 duration=end_time-start_time;
    // if(strcmp(terminal->name,"CAM-019522FF18000098")==0) printf("##########[%s]EngineOff...start_time:%u,end_time:%u,duration=%0.1f*60s\r\n\r\n",terminal->name,start_time,end_time,(float)duration/60);
   if(duration>60 && duration<24*60*60){
@@ -138,7 +138,7 @@ void terminal_init(void)
     mysql_free_result(res); 
   }
 
-  res=db_query("select id,sn,session,ip,port,groupid,state,boxid from `mc_devices` where session<>0");
+  res=db_query("select id,sn,session,ip,port,groupid,state,boxid,logintime from `mc_devices` where session<>0");
   if(res)
   { MYSQL_ROW row;
     while((row = mysql_fetch_row(res)))
@@ -158,7 +158,7 @@ void terminal_init(void)
         node->group=atoi(row[5]);//field["groupid"]
         node->term_state=atoi(row[6]);//field["state"]
         ((TTermDevice *)node)->boxid=atoi(row[7]);//field["boxid"];
-        ((TTermDevice *)node)->startup_time=0;
+        ((TTermDevice *)node)->onlinetime=atoi(row[8]);
       }
     }   
     mysql_free_result(res); 

@@ -3,3 +3,17 @@ flush privileges;
 grant select on meowcloud.mc_devices to miaow_r@"%" identified by 'Miao123456';
 grant select on meowcloud.mc_flowpackage to miaow_r@"%" identified by 'Miao123456';
 flush privileges;
+
+
+
+insert into mysql.user(Host,User,Password,ssl_cipher,x509_issuer,x509_subject) values("localhost","meow_r",password("Meow123456"),'','','');
+flush privileges;
+grant select on meowcloud.* to meow_r@"%" identified by 'Meow123456';
+grant select,update on meowcloud.mc_users to meow_r@"%" identified by 'Meow123456';
+flush privileges;
+
+
+
+FTP@dev.mplanet.cn    meow  meowcloud123
+mysql@dev.mplanet.cn  meow_r  Meow123456
+

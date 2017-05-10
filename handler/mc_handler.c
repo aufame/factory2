@@ -53,9 +53,6 @@ void Handle_MSG_DSR_LOGIN(TMcPacket *packet)
     if(!box_login)
     { terminal->term_state=deviceState; //the login action do not change device state
       ((TTermDevice *)terminal)->boxid=deviceBox;
-      if(deviceState==DEV_STATE_STARTING) ((TTermDevice *)terminal)->startup_time=time(NULL);
-      else if( ((TTermDevice *)terminal)->startup_time==0) ((TTermDevice *)terminal)->startup_time=loginTime;
-      //puts("################Login and set startup_time");
     }
     strncpy(terminal->name,content->name,SIZE_SN_DEVICE+1);
     error_code=0;
@@ -104,13 +101,27 @@ void Handle_MSG_DSR_LOGIN(TMcPacket *packet)
   }
 }
         
+
 void Handle_MSG_USR_LOGIN(TMcPacket *packet)
 { TTerminal *terminal=NULL,*terminalKickOff=NULL;
   U32 userid=0,sessionid=0,userGroup;
   U8 sex_type,msgpush,livepush,error_code=0;
-  TMSG_USR_LOGIN *content=(TMSG_USR_LOGIN *)packet->msg.body;
-  if(db_checkSQL(content->name) && (content->psw[0]=='\0' || Password_check(content->psw)))//允许空密码登录（for电信乐驾）
-  {  MYSQL_RES *res=db_queryf("select id,session,groupid,sex,msgpush,livepush from `mc_users` where username='%s' and password=md5('%s')",content->name,content->psw);
+  char *username,pwd_pattern[SIZE_MD5+3];
+  if(packet->msg.msgid==MSG_USR_LOGIN){
+     TMSG_USR_LOGIN *content=(TMSG_USR_LOGIN *)packet->msg.body;
+     username=content->name;
+     if(content->psw[0]=='\0' || Password_check(content->psw))sprintf(pwd_pattern,"'%s'",content->psw);
+     else pwd_pattern[0]='\0';//Invalid password!
+  }
+  else{
+     TMSG_USR_LOGIN2 *content=(TMSG_USR_LOGIN2 *)packet->msg.body;
+     username=content->name;
+     if(strlen(content->psw_md5)==SIZE_MD5 && Password_check(content->psw_md5)) sprintf(pwd_pattern,"md5('%s')",content->psw_md5);
+     else pwd_pattern[0]='\0'; //Invalid password!
+  }
+
+  if(db_checkSQL(username) && pwd_pattern[0]!='\0')
+  {  MYSQL_RES *res=db_queryf("select id,session,groupid,sex,msgpush,livepush from `mc_users` where username='%s' and password=%s",username,pwd_pattern);
      if(res)
      {  MYSQL_ROW row=mysql_fetch_row(res);
         if(row)
@@ -168,7 +179,7 @@ void Handle_MSG_USR_LOGIN(TMcPacket *packet)
     terminal->msg_push_acceptable=msgpush;
     terminal->live_push_acceptable=livepush;
     terminal->encrypt=packet->msg.encrypt;//消息体默认加密方式
-    strncpy(terminal->name,content->name,SIZE_MOBILE_PHONE+1);
+    strncpy(terminal->name,username,SIZE_MOBILE_PHONE+1);
     db_queryf("update `mc_users` set session=%u,ip=%u,port=%u,logintime=unix_timestamp() where id=%u",sessionid,packet->peerAddr.ip,packet->peerAddr.port,userid);
     if(terminal->spyAddr.ip)
     { extern void spy_forwardLoginRequest(TMcMsg *,TNetAddr *);
@@ -176,13 +187,19 @@ void Handle_MSG_USR_LOGIN(TMcPacket *packet)
     } 
   }
   packet->terminal=terminal;
-  TMcMsg *msg=msg_alloc(MSG_SUA_LOGIN,sizeof(TMSG_SUA_LOGIN));
+  
+  TMcMsg *msg=msg_alloc(packet->msg.msgid|MSG_STA_GENERAL,sizeof(TMSG_SUA_LOGIN));
   TMSG_SUA_LOGIN *ackBody=(TMSG_SUA_LOGIN *)msg->body;
   ackBody->ack_synid=packet->msg.synid;
   ackBody->error=error_code;
   ackBody->session=sessionid;
   msg_send(msg,packet,NULL);
   if(error_code==0)DBLog_AppendData("\xFF\xFF\xFF\xFF\x00",5,terminal); //登录日志
+}
+
+
+void Handle_MSG_USR_LOGIN2(TMcPacket *packet)
+{  Handle_MSG_USR_LOGIN(packet);
 }
 
 void Handle_MSG_USR_LOGOUT(TMcPacket *packet)
@@ -477,7 +494,7 @@ void Handle_MSG_USR_GETBINDLIST(TMcPacket *packet){
   const int MAX_ITEM_SIZE=128;
   TMcMsg *ackmsg=msg_alloc(MSG_SUA_GETBINDLIST,sizeof(TMSG_SUA_GETBINDLIST)+MAX_BINDED_NUM*MAX_ITEM_SIZE);
   TMSG_SUA_GETBINDLIST *ackBody=(TMSG_SUA_GETBINDLIST *)ackmsg->body;
-  MYSQL_RES *res=db_queryf("select `mc_devices`.sn,`mc_devices`.name,`mc_devices`.ssid,`mc_uidpool`.uid,`mc_devices`.state from `mc_devices` left join `mc_uidpool` on `mc_devices`.sn=`mc_uidpool`.sn where `mc_devices`.username='%s' limit %d",packet->terminal->name,MAX_BINDED_NUM);
+  MYSQL_RES *res=db_queryf("select `mc_devices`.sn,`mc_devices`.name,`mc_devices`.ssid,`mc_devices`.imsi,`mc_uidpool`.uid,`mc_devices`.state from `mc_devices` left join `mc_uidpool` on `mc_devices`.sn=`mc_uidpool`.sn where `mc_devices`.username='%s' limit %d",packet->terminal->name,MAX_BINDED_NUM);
   char *json=(char *)ackBody->json.data;
   int jslen=sprintf(json,"{\"items\":[");	
   if(res){
@@ -485,7 +502,7 @@ void Handle_MSG_USR_GETBINDLIST(TMcPacket *packet){
     int bind_count=0;
     while((row = mysql_fetch_row(res))){ 
       if(bind_count++>0) json[jslen++]=',';	
-      jslen+=sprintf(json+jslen,"{\"sn\":\"%s\",\"name\":\"%s\",\"ssid\":\"%s\",\"uid\":\"%s\",\"state\":\"%s\"}",row[0],row[1],row[2],row[3],row[4]);
+      jslen+=sprintf(json+jslen,"{\"sn\":\"%s\",\"name\":\"%s\",\"ssid\":\"%s\",\"imsi\":\"%s\",\"uid\":\"%s\",\"state\":\"%s\"}",row[0],row[1],row[2],row[3],row[4],row[5]);
     }
     mysql_free_result(res);
   }  
@@ -605,7 +622,6 @@ void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
              if(dev_node){
                dev_node->term_state=new_state;
                device_stateNotifyUser(dev_node,0);
-               if(dev_node->term_state==DEV_STATE_STARTING)((TTermDevice *)dev_node)->startup_time=time(NULL);
              }
           }
         }
@@ -627,8 +643,20 @@ void Handle_MSG_DSR_NOTIFY_STATE(TMcPacket *packet){
   }*/
   else if(terminal->term_state!=new_state && new_state!=DEV_EVENT_ENGINEOFF){//修改状态变量并写入数据库
     //printf("###state from %d to %d\r\n",terminal->term_state,new_state);
-    if(new_state==DEV_STATE_ONLINE)((TTermDevice *)terminal)->startup_time=time(NULL);
-    else if(new_state==DEV_STATE_SLEEP && terminal->term_state!=DEV_STATE_WAKEUP)staticMap_generate(terminal);
+    if(new_state==DEV_STATE_ONLINE){
+        ((TTermDevice *)terminal)->onlinetime=time(NULL);
+    }
+    /*
+    else if(new_state==DEV_STATE_WAKEUP){
+        ((TTermDevice *)terminal)->onlinetime=0;
+    }
+    */
+    else if(new_state==DEV_STATE_SLEEP){
+       if(((TTermDevice *)terminal)->onlinetime){
+          staticMap_generate(terminal);
+          ((TTermDevice *)terminal)->onlinetime=0;
+       }
+    }
     terminal->term_state=new_state;
     db_queryf("update `mc_devices` set state=%d where id=%u",new_state,terminal->id);
     device_stateNotifyUser(terminal,0);
@@ -861,7 +889,6 @@ void Handle_MSG_DSR_UPLOAD_BEHAVIOR(TMcPacket *packet)
   //todo: 驾驶行为存储到数据库
 }
 
-#if 1 
 void Handle_MSG_DSR_UPLOAD_IMSI(TMcPacket *packet)
 { TMSG_DSR_UPLOAD_IMSI *req=(TMSG_DSR_UPLOAD_IMSI *)packet->msg.body;
   U8 ret_error=1;
@@ -896,8 +923,7 @@ void Handle_MSG_USR_QUERY_ACCESSNO(TMcPacket *packet)
   msg_send(ackmsg,packet,NULL);
 }
 
-#else
-
+/*
 void Handle_MSG_DSR_UPLOAD_IMSI(TMcPacket *packet)
 { TMSG_DSR_UPLOAD_IMSI *req=(TMSG_DSR_UPLOAD_IMSI *)packet->msg.body;
   U8 ret_error=1;
@@ -952,8 +978,7 @@ void Handle_MSG_USR_QUERY_ACCESSNO(TMcPacket *packet)
   msg_send(ackmsg,packet,NULL);
 }
 
-#endif
-
+*/
 
 void Handle_MSG_USR_CONFIGS(TMcPacket *packet)
 {/////////////////////////////////////////////
